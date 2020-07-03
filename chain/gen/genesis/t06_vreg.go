@@ -19,7 +19,7 @@ var RootVerifierAddr address.Address
 var RootVerifierID address.Address
 
 func init() {
-	k, err := address.NewFromString("t3qfoulel6fy6gn3hjmbhpdpf6fs5aqjb5fkurhtwvgssizq4jey5nw4ptq5up6h7jk7frdvvobv52qzmgjinq")
+	k, err := address.NewFromString("t3q45wllvljpxedgpvxzwgro6qoxbpahrtzlqvdfe2o3vutppdnckslf334jexqs3acgyvijtlxn2lgger5eha")
 	if err != nil {
 		panic(err)
 	}

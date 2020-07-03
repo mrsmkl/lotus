@@ -97,7 +97,7 @@ func (n *ProviderNodeAdapter) OnDealComplete(ctx context.Context, deal storagema
 	if err != nil {
 		return xerrors.Errorf("AddPiece failed: %s", err)
 	}
-	log.Warnf("New Deal: deal %d", deal.DealID)
+	log.Warnf("New Deal --------------------- : deal %d", deal.DealID)
 
 	return nil
 }
@@ -226,23 +226,30 @@ func (n *ProviderNodeAdapter) LocatePieceForDealWithinSector(ctx context.Context
 }
 
 func (n *ProviderNodeAdapter) OnDealSectorCommitted(ctx context.Context, provider address.Address, dealID abi.DealID, cb storagemarket.DealSectorCommittedCallback) error {
+	log.Info("on deal sector committes")
 	checkFunc := func(ts *types.TipSet) (done bool, more bool, err error) {
+		log.Info("checking")
 		sd, err := n.StateMarketStorageDeal(ctx, dealID, ts.Key())
 
 		if err != nil {
 			// TODO: This may be fine for some errors
+			log.Infof("erroro %w", err)
 			return false, false, xerrors.Errorf("failed to look up deal on chain: %w", err)
 		}
 
 		if sd.State.SectorStartEpoch > 0 {
+			log.Info("callcallback")
 			cb(nil)
 			return true, false, nil
 		}
+
+		log.Info("nothing")
 
 		return false, true, nil
 	}
 
 	called := func(msg *types.Message, rec *types.MessageReceipt, ts *types.TipSet, curH abi.ChainEpoch) (more bool, err error) {
+		log.Info("called")
 		defer func() {
 			if err != nil {
 				cb(xerrors.Errorf("handling applied event: %w", err))
@@ -280,6 +287,7 @@ func (n *ProviderNodeAdapter) OnDealSectorCommitted(ctx context.Context, provide
 	var sectorFound bool
 
 	matchEvent := func(msg *types.Message) (bool, error) {
+		log.Info("match")
 		if msg.To != provider {
 			return false, nil
 		}

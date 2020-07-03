@@ -118,6 +118,8 @@ func (e *hcEvents) processHeadChangeEvent(rev, app []*types.TipSet) error {
 	e.lk.Lock()
 	defer e.lk.Unlock()
 
+	log.Info("actually got head change event")
+
 	for _, ts := range rev {
 		e.handleReverts(ts)
 		e.lastTs = ts
@@ -197,6 +199,8 @@ func (e *hcEvents) queueForConfidence(trigID uint64, data eventData, prevTs, ts 
 
 	triggerH := appliedH + abi.ChainEpoch(trigger.confidence)
 
+	log.Infof("queueeuing %v %v %v", prevH, appliedH, triggerH)
+
 	byOrigH, ok := e.confQueue[triggerH]
 	if !ok {
 		byOrigH = map[abi.ChainEpoch][]*queuedEvent{}
@@ -215,8 +219,10 @@ func (e *hcEvents) queueForConfidence(trigID uint64, data eventData, prevTs, ts 
 
 // Apply any events that were waiting for this chain height for confidence
 func (e *hcEvents) applyWithConfidence(ts *types.TipSet, height abi.ChainEpoch) {
+	log.Info("apply with confi")
 	byOrigH, ok := e.confQueue[height]
 	if !ok {
+		log.Info("but there was nothing")
 		return // no triggers at this height
 	}
 
@@ -319,6 +325,10 @@ func (e *hcEvents) onHeadChanged(check CheckFunc, hnd EventHandler, rev RevertHa
 	// Create a trigger for the event
 	id := e.ctr
 	e.ctr++
+
+	if more {
+		log.Info("we want more")
+	}
 
 	e.triggers[id] = &handlerInfo{
 		confidence: confidence,
@@ -482,6 +492,7 @@ func (me *messageEvents) checkNewCalls(ts *types.TipSet) (map[triggerID]eventDat
 	res := make(map[triggerID]eventData)
 	me.messagesForTs(pts, func(msg *types.Message) {
 		// TODO: provide receipts
+		log.Info("it had messages")
 
 		for tid, matchFns := range me.matchers {
 			var matched bool
@@ -515,6 +526,9 @@ func (me *messageEvents) messagesForTs(ts *types.TipSet, consume func(*types.Mes
 	for _, tsb := range ts.Blocks() {
 
 		msgs, err := me.cs.ChainGetBlockMessages(context.TODO(), tsb.Cid())
+
+		log.Infof("got messages %v", len(msgs.BlsMessages)+len(msgs.SecpkMessages))
+
 		if err != nil {
 			log.Errorf("messagesForTs MessagesForBlock failed (ts.H=%d, Bcid:%s, B.Mcid:%s): %s", ts.Height(), tsb.Cid(), tsb.Messages, err)
 			// this is quite bad, but probably better than missing all the other updates
@@ -580,6 +594,7 @@ type MsgMatchFunc func(msg *types.Message) (bool, error)
 //   `MsgHandler` is called)
 func (me *messageEvents) Called(check CheckFunc, msgHnd MsgHandler, rev RevertHandler, confidence int, timeout abi.ChainEpoch, mf MsgMatchFunc) error {
 	hnd := func(data eventData, prevTs, ts *types.TipSet, height abi.ChainEpoch) (bool, error) {
+		log.Info("handling here")
 		msg, ok := data.(*types.Message)
 		if data != nil && !ok {
 			panic("expected msg")
@@ -587,6 +602,7 @@ func (me *messageEvents) Called(check CheckFunc, msgHnd MsgHandler, rev RevertHa
 
 		rec, err := me.cs.StateGetReceipt(me.ctx, msg.Cid(), ts.Key())
 		if err != nil {
+			log.Infof("soe error %w", err)
 			return false, err
 		}
 

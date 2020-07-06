@@ -118,8 +118,6 @@ func (e *hcEvents) processHeadChangeEvent(rev, app []*types.TipSet) error {
 	e.lk.Lock()
 	defer e.lk.Unlock()
 
-	log.Info("actually got head change event")
-
 	for _, ts := range rev {
 		e.handleReverts(ts)
 		e.lastTs = ts
@@ -199,8 +197,6 @@ func (e *hcEvents) queueForConfidence(trigID uint64, data eventData, prevTs, ts 
 
 	triggerH := appliedH + abi.ChainEpoch(trigger.confidence)
 
-	log.Infof("queueeuing %v %v %v", prevH, appliedH, triggerH)
-
 	byOrigH, ok := e.confQueue[triggerH]
 	if !ok {
 		byOrigH = map[abi.ChainEpoch][]*queuedEvent{}
@@ -219,10 +215,8 @@ func (e *hcEvents) queueForConfidence(trigID uint64, data eventData, prevTs, ts 
 
 // Apply any events that were waiting for this chain height for confidence
 func (e *hcEvents) applyWithConfidence(ts *types.TipSet, height abi.ChainEpoch) {
-	log.Info("apply with confi")
 	byOrigH, ok := e.confQueue[height]
 	if !ok {
-		log.Info("but there was nothing")
 		return // no triggers at this height
 	}
 
@@ -492,7 +486,6 @@ func (me *messageEvents) checkNewCalls(ts *types.TipSet) (map[triggerID]eventDat
 	res := make(map[triggerID]eventData)
 	me.messagesForTs(pts, func(msg *types.Message) {
 		// TODO: provide receipts
-		log.Info("it had messages")
 
 		for tid, matchFns := range me.matchers {
 			var matched bool
@@ -526,8 +519,6 @@ func (me *messageEvents) messagesForTs(ts *types.TipSet, consume func(*types.Mes
 	for _, tsb := range ts.Blocks() {
 
 		msgs, err := me.cs.ChainGetBlockMessages(context.TODO(), tsb.Cid())
-
-		log.Infof("got messages %v", len(msgs.BlsMessages)+len(msgs.SecpkMessages))
 
 		if err != nil {
 			log.Errorf("messagesForTs MessagesForBlock failed (ts.H=%d, Bcid:%s, B.Mcid:%s): %s", ts.Height(), tsb.Cid(), tsb.Messages, err)

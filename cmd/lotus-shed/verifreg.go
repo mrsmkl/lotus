@@ -39,8 +39,19 @@ var verifRegCmd = &cli.Command{
 var verifRegAddVerifierCmd = &cli.Command{
 	Name:  "add-verifier",
 	Usage: "make a given account a verifier",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "from",
+			Usage: "specify your verifier address to send the message from",
+		},
+	},
 	Action: func(cctx *cli.Context) error {
-		fromk, err := address.NewFromString("t3q45wllvljpxedgpvxzwgro6qoxbpahrtzlqvdfe2o3vutppdnckslf334jexqs3acgyvijtlxn2lgger5eha")
+		froms := cctx.String("from")
+		if froms == "" {
+			return fmt.Errorf("must specify from address with --from")
+		}
+
+		fromk, err := address.NewFromString(froms)
 		if err != nil {
 			return err
 		}

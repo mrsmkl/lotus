@@ -131,3 +131,5 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 replace github.com/filecoin-project/go-fil-markets => /home/sami/go-fil-markets
 
 replace github.com/filecoin-project/storage-fsm => /home/sami/storage-fsm
+
+replace github.com/filecoin-project/specs-actors => /home/sami/specs-actors

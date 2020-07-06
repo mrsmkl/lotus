@@ -301,7 +301,6 @@ func (c *ClientNodeAdapter) OnDealSectorCommitted(ctx context.Context, provider 
 	var sectorNumber abi.SectorNumber
 	var sectorFound bool
 	matchEvent := func(msg *types.Message) (bool, error) {
-		log.Info("match")
 		if msg.To != provider {
 			return false, nil
 		}

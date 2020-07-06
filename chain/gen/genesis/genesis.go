@@ -128,6 +128,8 @@ func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template ge
 
 	// Create init actor
 
+	InitVerifiedRegistryActor(template.RootKey)
+
 	initact, err := SetupInitActor(bs, template.NetworkName, template.Accounts)
 	if err != nil {
 		return nil, xerrors.Errorf("setup init actor: %w", err)
@@ -139,7 +141,7 @@ func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template ge
 	// Setup reward
 	rewact, err := SetupRewardActor(bs)
 	if err != nil {
-		return nil, xerrors.Errorf("setup init actor: %w", err)
+		return nil, xerrors.Errorf("setup reward actor: %w", err)
 	}
 
 	err = state.SetActor(builtin.RewardActorAddr, rewact)

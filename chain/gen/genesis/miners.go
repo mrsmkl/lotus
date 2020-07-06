@@ -237,6 +237,8 @@ func SetupStorageMiners(ctx context.Context, cs *store.ChainStore, sroot cid.Cid
 
 				pledge := miner.InitialPledgeForPower(sectorWeight, tpow.QualityAdjPower, tpow.PledgeCollateral, epochReward, circSupply(ctx, vm, minerInfos[i].maddr))
 
+				log.Infof("Miner %w", minerInfos[i].maddr)
+
 				_, err = doExecValue(ctx, vm, minerInfos[i].maddr, m.Worker, pledge, builtin.MethodsMiner.PreCommitSector, mustEnc(params))
 				if err != nil {
 					return cid.Undef, xerrors.Errorf("failed to confirm presealed sectors: %w", err)

@@ -34,6 +34,7 @@ var verifRegCmd = &cli.Command{
 		verifRegListClientsCmd,
 		verifRegCheckClientCmd,
 		verifRegCheckVerifierCmd,
+		verifRegSetRootCmd,
 	},
 }
 
@@ -96,6 +97,77 @@ var verifRegAddVerifierCmd = &cli.Command{
 			To:       builtin.VerifiedRegistryActorAddr,
 			From:     fromk,
 			Method:   builtin.MethodsVerifiedRegistry.AddVerifier,
+			GasPrice: types.NewInt(1),
+			GasLimit: 300000,
+			Params:   params,
+		}
+
+		smsg, err := api.MpoolPushMessage(ctx, msg)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("message sent, now waiting on cid: %s\n", smsg.Cid())
+
+		mwait, err := api.StateWaitMsg(ctx, smsg.Cid(), build.MessageConfidence)
+		if err != nil {
+			return err
+		}
+
+		if mwait.Receipt.ExitCode != 0 {
+			return fmt.Errorf("failed to add verifier: %d", mwait.Receipt.ExitCode)
+		}
+
+		return nil
+
+	},
+}
+
+var verifRegSetRootCmd = &cli.Command{
+	Name:  "set-root",
+	Usage: "make a key the new root key",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "from",
+			Usage: "specify your rootkey address to send the message from",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		if cctx.Args().Len() != 1 {
+			return fmt.Errorf("must specify one argument: address")
+		}
+
+		target, err := address.NewFromString(cctx.Args().Get(0))
+		if err != nil {
+			return err
+		}
+
+		params, err := actors.SerializeParams(target)
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetFullNodeAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+		ctx := lcli.ReqContext(cctx)
+
+		froms := cctx.String("from")
+		if froms == "" {
+			return fmt.Errorf("must specify from address with --from")
+		}
+
+		fromk, err := address.NewFromString(froms)
+		if err != nil {
+			return err
+		}
+
+		msg := &types.Message{
+			To:       builtin.VerifiedRegistryActorAddr,
+			From:     fromk,
+			Method:   builtin.MethodsVerifiedRegistry.ReplaceRootKey,
 			GasPrice: types.NewInt(1),
 			GasLimit: 300000,
 			Params:   params,

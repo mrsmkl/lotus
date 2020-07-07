@@ -1,5 +1,6 @@
+#!/bin/bash
 
-sleep 30
+lotus wait-api
 
 lotus chain head
 

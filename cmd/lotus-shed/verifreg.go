@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/filecoin-project/lotus/build"
@@ -40,22 +41,16 @@ var verifRegAddVerifierCmd = &cli.Command{
 	Name:  "add-verifier",
 	Usage: "make a given account a verifier",
 	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "dry",
+			Usage: "only prints tx param data",
+		},
 		&cli.StringFlag{
 			Name:  "from",
 			Usage: "specify your verifier address to send the message from",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		froms := cctx.String("from")
-		if froms == "" {
-			return fmt.Errorf("must specify from address with --from")
-		}
-
-		fromk, err := address.NewFromString(froms)
-		if err != nil {
-			return err
-		}
-
 		if cctx.Args().Len() != 2 {
 			return fmt.Errorf("must specify two arguments: address and allowance")
 		}
@@ -75,12 +70,27 @@ var verifRegAddVerifierCmd = &cli.Command{
 			return err
 		}
 
+		if cctx.Bool("dry") {
+			fmt.Println(hex.EncodeToString(params))
+			return nil
+		}
+
 		api, closer, err := lcli.GetFullNodeAPI(cctx)
 		if err != nil {
 			return err
 		}
 		defer closer()
 		ctx := lcli.ReqContext(cctx)
+
+		froms := cctx.String("from")
+		if froms == "" {
+			return fmt.Errorf("must specify from address with --from")
+		}
+
+		fromk, err := address.NewFromString(froms)
+		if err != nil {
+			return err
+		}
 
 		msg := &types.Message{
 			To:       builtin.VerifiedRegistryActorAddr,

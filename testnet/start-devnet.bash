@@ -58,7 +58,7 @@ configure_lotus() {
 
 purge_local_dirs() {
   echo -e "\nRemoving local state\n"
-  rm -rf ~/.lotus/datastore || true
+  rm -rf ~/.lotus || true
   rm -rf ~/.lotusstorage || true
   rm -rf ~/.genesis-sectors || true
 }

@@ -19,11 +19,9 @@ var RootVerifierAddr address.Address
 var RootVerifierID address.Address
 
 func InitVerifiedRegistryActor(k address.Address) {
-	/*
-		k, err := address.NewFromString("t3q45wllvljpxedgpvxzwgro6qoxbpahrtzlqvdfe2o3vutppdnckslf334jexqs3acgyvijtlxn2lgger5eha")
-		if err != nil {
-			panic(err)
-		}*/
+	if k == address.Undef {
+		k, _ = address.NewFromString("t3q45wllvljpxedgpvxzwgro6qoxbpahrtzlqvdfe2o3vutppdnckslf334jexqs3acgyvijtlxn2lgger5eha")
+	}
 
 	RootVerifierAddr = k
 
@@ -34,6 +32,23 @@ func InitVerifiedRegistryActor(k address.Address) {
 
 	RootVerifierID = idk
 }
+
+/*
+func init() {
+	k, err := address.NewFromString("t3q45wllvljpxedgpvxzwgro6qoxbpahrtzlqvdfe2o3vutppdnckslf334jexqs3acgyvijtlxn2lgger5eha")
+	if err != nil {
+		panic(err)
+	}
+
+	RootVerifierAddr = k
+
+	idk, err := address.NewFromString("t080")
+	if err != nil {
+		panic(err)
+	}
+
+	RootVerifierID = idk
+}*/
 
 func SetupVerifiedRegistryActor(bs bstore.Blockstore) (*types.Actor, error) {
 	cst := cbor.NewCborStore(bs)

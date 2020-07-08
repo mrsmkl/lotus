@@ -56,7 +56,6 @@ func NewProviderNodeAdapter(dag dtypes.StagingDAG, secb *sectorblocks.SectorBloc
 
 func (n *ProviderNodeAdapter) PublishDeals(ctx context.Context, deal storagemarket.MinerDeal) (cid.Cid, error) {
 	log.Info("publishing deal")
-	log.Infof("deal %w", deal.ClientDealProposal)
 
 	mi, err := n.StateMinerInfo(ctx, deal.Proposal.Provider, types.EmptyTSK)
 	if err != nil {
@@ -99,7 +98,7 @@ func (n *ProviderNodeAdapter) OnDealComplete(ctx context.Context, deal storagema
 	if err != nil {
 		return xerrors.Errorf("AddPiece failed: %s", err)
 	}
-	log.Warnf("New Deal --------------------- : deal %d", deal.DealID)
+	log.Warnf("New Deal: deal %d", deal.DealID)
 
 	return nil
 }

@@ -320,10 +320,6 @@ func (e *hcEvents) onHeadChanged(check CheckFunc, hnd EventHandler, rev RevertHa
 	id := e.ctr
 	e.ctr++
 
-	if more {
-		log.Info("we want more")
-	}
-
 	e.triggers[id] = &handlerInfo{
 		confidence: confidence,
 		timeout:    timeout + abi.ChainEpoch(confidence),
@@ -519,7 +515,6 @@ func (me *messageEvents) messagesForTs(ts *types.TipSet, consume func(*types.Mes
 	for _, tsb := range ts.Blocks() {
 
 		msgs, err := me.cs.ChainGetBlockMessages(context.TODO(), tsb.Cid())
-
 		if err != nil {
 			log.Errorf("messagesForTs MessagesForBlock failed (ts.H=%d, Bcid:%s, B.Mcid:%s): %s", ts.Height(), tsb.Cid(), tsb.Messages, err)
 			// this is quite bad, but probably better than missing all the other updates
@@ -585,7 +580,6 @@ type MsgMatchFunc func(msg *types.Message) (bool, error)
 //   `MsgHandler` is called)
 func (me *messageEvents) Called(check CheckFunc, msgHnd MsgHandler, rev RevertHandler, confidence int, timeout abi.ChainEpoch, mf MsgMatchFunc) error {
 	hnd := func(data eventData, prevTs, ts *types.TipSet, height abi.ChainEpoch) (bool, error) {
-		log.Info("handling here")
 		msg, ok := data.(*types.Message)
 		if data != nil && !ok {
 			panic("expected msg")
@@ -593,7 +587,6 @@ func (me *messageEvents) Called(check CheckFunc, msgHnd MsgHandler, rev RevertHa
 
 		rec, err := me.cs.StateGetReceipt(me.ctx, msg.Cid(), ts.Key())
 		if err != nil {
-			log.Infof("soe error %w", err)
 			return false, err
 		}
 

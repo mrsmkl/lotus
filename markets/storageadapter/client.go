@@ -241,30 +241,23 @@ func (c *ClientNodeAdapter) ValidatePublishedDeal(ctx context.Context, deal stor
 
 func (c *ClientNodeAdapter) OnDealSectorCommitted(ctx context.Context, provider address.Address, dealId abi.DealID, cb storagemarket.DealSectorCommittedCallback) error {
 
-	log.Info("On deal sector committed")
-
 	checkFunc := func(ts *types.TipSet) (done bool, more bool, err error) {
-		log.Info("check")
 		sd, err := stmgr.GetStorageDeal(ctx, c.StateManager, dealId, ts)
 
 		if err != nil {
 			// TODO: This may be fine for some errors
-			log.Infof("errror %v", err)
 			return false, false, xerrors.Errorf("client: failed to look up deal on chain: %w", err)
 		}
 
 		if sd.State.SectorStartEpoch > 0 {
-			log.Info("what?")
 			cb(nil)
 			return true, false, nil
 		}
 
-		log.Info("Nothing???              ????                          ????")
 		return false, true, nil
 	}
 
 	called := func(msg *types.Message, rec *types.MessageReceipt, ts *types.TipSet, curH abi.ChainEpoch) (more bool, err error) {
-		log.Info("called")
 		defer func() {
 			if err != nil {
 				cb(xerrors.Errorf("handling applied event: %w", err))
@@ -341,7 +334,7 @@ func (c *ClientNodeAdapter) OnDealSectorCommitted(ctx context.Context, provider 
 		}
 	}
 
-	if err := c.ev.Called(checkFunc, called, revert, int(build.MessageConfidence+1), 100, matchEvent); err != nil {
+	if err := c.ev.Called(checkFunc, called, revert, int(build.MessageConfidence+1), build.SealRandomnessLookbackLimit, matchEvent); err != nil {
 		return xerrors.Errorf("failed to set up called handler: %w", err)
 	}
 

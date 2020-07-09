@@ -858,9 +858,19 @@ func (a *StateAPI) StateVerifiedClientStatus(ctx context.Context, addr address.A
 	}
 	log.Infof("Loaded node %w", vh)
 
+	log.Infof(" %v", addr.Bytes())
+	key := string(addr.Bytes())
 	var dcap verifreg.DataCap
-	if err := vh.Find(ctx, string(addr.Bytes()), &dcap); err != nil {
-		log.Info("FOudn data")
+	if err := vh.ForEach(ctx, func(k string, val interface{}) error {
+		if key == k {
+			log.Info("Foudn it")
+			if err := dcap.UnmarshalCBOR(bytes.NewReader(val.(*cbg.Deferred).Raw)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Info("Found error")
 		if err == hamt.ErrNotFound {
 			return nil, nil
 		}

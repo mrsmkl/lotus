@@ -40,7 +40,7 @@ lotus-shed verifreg verify-client --from $VERIFIER $CLIENT 100000000000000000000
 
 lotus-shed verifreg list-clients
 
-export DATA=$(lotus client import dddd)
+export DATA=$(lotus client import dddd | awk '{print $NF}')
 
 lotus client local
 

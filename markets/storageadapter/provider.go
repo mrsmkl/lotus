@@ -83,6 +83,7 @@ func (n *ProviderNodeAdapter) PublishDeals(ctx context.Context, deal storagemark
 		Params:   params,
 	})
 	if err != nil {
+		log.Errorf("publishing deal failed %w", err)
 		return cid.Undef, err
 	}
 	return smsg.Cid(), nil

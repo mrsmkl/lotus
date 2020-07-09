@@ -683,7 +683,7 @@ func (vm *VM) transfer(from, to address.Address, amt types.BigInt) aerrors.Actor
 	}
 
 	if err := deductFunds(f, amt); err != nil {
-		return aerrors.Newf(exitcode.SysErrInsufficientFunds, "transfer failed when deducting funds: %s", err)
+		return aerrors.Newf(exitcode.SysErrInsufficientFunds, "transfer failed when deducting funds from %s to %s: %s", fromID, toID, err)
 	}
 	depositFunds(t, amt)
 

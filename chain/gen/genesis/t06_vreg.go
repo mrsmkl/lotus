@@ -18,10 +18,9 @@ var RootVerifierAddr address.Address
 
 var RootVerifierID address.Address
 
-func init() {
-	k, err := address.NewFromString("t3qfoulel6fy6gn3hjmbhpdpf6fs5aqjb5fkurhtwvgssizq4jey5nw4ptq5up6h7jk7frdvvobv52qzmgjinq")
-	if err != nil {
-		panic(err)
+func InitVerifiedRegistryActor(k address.Address) {
+	if k == address.Undef {
+		k, _ = address.NewFromString("t3qfoulel6fy6gn3hjmbhpdpf6fs5aqjb5fkurhtwvgssizq4jey5nw4ptq5up6h7jk7frdvvobv52qzmgjinq")
 	}
 
 	RootVerifierAddr = k

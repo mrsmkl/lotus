@@ -239,6 +239,7 @@ func (c *ClientNodeAdapter) ValidatePublishedDeal(ctx context.Context, deal stor
 }
 
 func (c *ClientNodeAdapter) OnDealSectorCommitted(ctx context.Context, provider address.Address, dealId abi.DealID, cb storagemarket.DealSectorCommittedCallback) error {
+
 	checkFunc := func(ts *types.TipSet) (done bool, more bool, err error) {
 		sd, err := stmgr.GetStorageDeal(ctx, c.StateManager, dealId, ts)
 

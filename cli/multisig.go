@@ -285,7 +285,7 @@ var msigProposeCmd = &cli.Command{
 		}
 
 		if cctx.Args().Len() > 3 && cctx.Args().Len() != 5 {
-			return fmt.Errorf("usage: msig propose <msig addr> <desination> <value> [ <method> <params> ]")
+			return fmt.Errorf("usage: msig propose <msig addr> <destination> <value> [ <method> <params> ]")
 		}
 
 		msig, err := address.NewFromString(cctx.Args().Get(0))
@@ -384,7 +384,7 @@ var msigApproveCmd = &cli.Command{
 		}
 
 		if cctx.Args().Len() > 5 && cctx.Args().Len() != 7 {
-			return fmt.Errorf("usage: msig approve <msig addr> <message ID> <proposer address> <desination> <value> [ <method> <params> ]")
+			return fmt.Errorf("usage: msig approve <msig addr> <message ID> <proposer address> <destination> <value> [ <method> <params> ]")
 		}
 
 		msig, err := address.NewFromString(cctx.Args().Get(0))

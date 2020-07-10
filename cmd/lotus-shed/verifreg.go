@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/urfave/cli/v2"
@@ -164,9 +165,9 @@ var verifRegSetRootCmd = &cli.Command{
 		}
 
 		msg := &types.Message{
-			To:       builtin.VerifiedRegistryActorAddr,
-			From:     fromk,
-			Method:   builtin.MethodsVerifiedRegistry.ReplaceRootKey,
+			To:   builtin.VerifiedRegistryActorAddr,
+			From: fromk,
+			// Method:   builtin.MethodsVerifiedRegistry.ReplaceRootKey,
 			GasPrice: types.NewInt(1),
 			GasLimit: 300000,
 			Params:   params,
@@ -320,6 +321,88 @@ var verifRegListVerifiersCmd = &cli.Command{
 	},
 }
 
+/*
+type hashBits struct {
+	b        []byte
+	consumed int
+}
+
+func mkmask(n int) byte {
+	return (1 << uint(n)) - 1
+}
+
+func (hb *hashBits) Next(i int) (int, error) {
+	if hb.consumed+i > len(hb.b)*8 {
+		return 0, fmt.Errorf("sharded directory too deep")
+	}
+	return hb.next(i), nil
+}
+
+func (hb *hashBits) next(i int) int {
+	curbi := hb.consumed / 8
+	leftb := 8 - (hb.consumed % 8)
+
+	curb := hb.b[curbi]
+	if i == leftb {
+		out := int(mkmask(i) & curb)
+		hb.consumed += i
+		return out
+	} else if i < leftb {
+		a := curb & mkmask(leftb) // mask out the high bits we don't want
+		b := a & ^mkmask(leftb-i) // mask out the low bits we don't want
+		c := b >> uint(leftb-i)   // shift whats left down
+		hb.consumed += i
+		return int(c)
+	} else {
+		out := int(mkmask(leftb) & curb)
+		out <<= uint(i - leftb)
+		hb.consumed += leftb
+		out += hb.next(i - leftb)
+		return out
+	}
+}
+
+func FindRaw(n *hamt.Node, ctx context.Context, k string) ([]byte, error) {
+	var ret []byte
+	err := getValue(n, ctx, &hashBits{b: n.hash([]byte(k))}, k, func(kv *hamt.KV) error {
+		ret = kv.Value.Raw
+		return nil
+	})
+	return ret, err
+}
+
+func getValue(n *hamt.Node, ctx context.Context, hv *hashBits, k string, cb func(*KV) error) error {
+	idx, err := hv.Next(n.bitWidth)
+	if err != nil {
+		return ErrMaxDepth
+	}
+
+	if n.Bitfield.Bit(idx) == 0 {
+		return ErrNotFound
+	}
+
+	cindex := byte(n.indexForBitPos(idx))
+
+	c := n.getChild(cindex)
+	if c.isShard() {
+		chnd, err := c.loadChild(ctx, n.store, n.bitWidth, n.hash)
+		if err != nil {
+			return err
+		}
+
+		return chnd.getValue(ctx, hv, k, cb)
+	}
+
+	for _, kv := range c.KVs {
+		if string(kv.Key) == k {
+			return cb(kv)
+		}
+	}
+
+	return ErrNotFound
+}
+*/
+
 var verifRegListClientsCmd = &cli.Command{
 	Name:  "list-clients",
 	Usage: "list all verified clients",
@@ -348,9 +431,18 @@ var verifRegListClientsCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
+		log.Infof("Loaded node %v %v", len(vh.Pointers), vh.Bitfield)
+
+		// var dcap verifreg.DataCap
+		addr, _ := address.NewFromString("t1xdzis7pauuihealpvdfz7kj5pcjizil7sbtblni")
+		log.Infof("fooq %v", addr.Bytes())
+		if _, err := vh.FindRaw(ctx, string(addr.Bytes())); err != nil {
+			log.Warnf("what %w", err)
+		}
 
 		if err := vh.ForEach(ctx, func(k string, val interface{}) error {
 			addr, err := address.NewFromBytes([]byte(k))
+			log.Infof("fooq %v %v", addr.Bytes(), []byte(k))
 			if err != nil {
 				return err
 			}

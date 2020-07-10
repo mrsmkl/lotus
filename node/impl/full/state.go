@@ -838,11 +838,13 @@ func (a *StateAPI) StateMinerAvailableBalance(ctx context.Context, maddr address
 // Returns nil if there is no entry in the data cap table for the
 // address.
 func (a *StateAPI) StateVerifiedClientStatus(ctx context.Context, addr address.Address, tsk types.TipSetKey) (*verifreg.DataCap, error) {
+	log.Infof("Getting status %v", addr.Bytes())
 	act, err := a.StateGetActor(ctx, builtin.VerifiedRegistryActorAddr, tsk)
 	if err != nil {
 		return nil, err
 	}
 
+	log.Info("Got actor")
 	cst := cbor.NewCborStore(a.StateManager.ChainStore().Blockstore())
 
 	var st verifreg.State
@@ -854,9 +856,21 @@ func (a *StateAPI) StateVerifiedClientStatus(ctx context.Context, addr address.A
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("Loaded node %w", vh)
 
+	log.Infof(" %v", addr.Bytes())
+	key := string(addr.Bytes())
 	var dcap verifreg.DataCap
-	if err := vh.Find(ctx, string(addr.Bytes()), &dcap); err != nil {
+	if err := vh.ForEach(ctx, func(k string, val interface{}) error {
+		if key == k {
+			log.Info("Foudn it")
+			if err := dcap.UnmarshalCBOR(bytes.NewReader(val.(*cbg.Deferred).Raw)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Info("Found error")
 		if err == hamt.ErrNotFound {
 			return nil, nil
 		}

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-filestore"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/filecoin-project/go-address"
@@ -192,7 +191,9 @@ type FullNode interface {
 	// retrieval markets as a client
 
 	// ClientImport imports file under the specified path into filestore.
-	ClientImport(ctx context.Context, ref FileRef) (cid.Cid, error)
+	ClientImport(ctx context.Context, ref FileRef) (*ImportRes, error)
+	// ClientRemoveImport removes file import
+	ClientRemoveImport(ctx context.Context, importID int64) error
 	// ClientStartDeal proposes a deal with a miner.
 	ClientStartDeal(ctx context.Context, params *StartDealParams) (*cid.Cid, error)
 	// ClientGetDealInfo returns the latest information about a given deal.
@@ -202,9 +203,9 @@ type FullNode interface {
 	// ClientHasLocal indicates whether a certain CID is locally stored.
 	ClientHasLocal(ctx context.Context, root cid.Cid) (bool, error)
 	// ClientFindData identifies peers that have a certain file, and returns QueryOffers (one per peer).
-	ClientFindData(ctx context.Context, root cid.Cid) ([]QueryOffer, error)
+	ClientFindData(ctx context.Context, root cid.Cid, piece *cid.Cid) ([]QueryOffer, error)
 	// ClientMinerQueryOffer returns a QueryOffer for the specific miner and file.
-	ClientMinerQueryOffer(ctx context.Context, root cid.Cid, miner address.Address) (QueryOffer, error)
+	ClientMinerQueryOffer(ctx context.Context, miner address.Address, root cid.Cid, piece *cid.Cid) (QueryOffer, error)
 	// ClientRetrieve initiates the retrieval of a file, as specified in the order.
 	ClientRetrieve(ctx context.Context, order RetrievalOrder, ref *FileRef) error
 	// ClientQueryAsk returns a signed StorageAsk from the specified miner.
@@ -360,11 +361,18 @@ type MinerSectors struct {
 	Pset uint64
 }
 
+type ImportRes struct {
+	Root     cid.Cid
+	ImportID int64
+}
+
 type Import struct {
-	Status   filestore.Status
-	Key      cid.Cid
+	Key int64
+	Err string
+
+	Root     *cid.Cid
+	Source   string
 	FilePath string
-	Size     uint64
 }
 
 type DealInfo struct {
@@ -452,7 +460,8 @@ type MinerPower struct {
 type QueryOffer struct {
 	Err string
 
-	Root cid.Cid
+	Root  cid.Cid
+	Piece *cid.Cid
 
 	Size                    uint64
 	MinPrice                types.BigInt
@@ -465,6 +474,7 @@ type QueryOffer struct {
 func (o *QueryOffer) Order(client address.Address) RetrievalOrder {
 	return RetrievalOrder{
 		Root:                    o.Root,
+		Piece:                   o.Piece,
 		Size:                    o.Size,
 		Total:                   o.MinPrice,
 		PaymentInterval:         o.PaymentInterval,
@@ -488,8 +498,9 @@ type MarketDeal struct {
 
 type RetrievalOrder struct {
 	// TODO: make this less unixfs specific
-	Root cid.Cid
-	Size uint64
+	Root  cid.Cid
+	Piece *cid.Cid
+	Size  uint64
 	// TODO: support offset
 	Total                   types.BigInt
 	PaymentInterval         uint64

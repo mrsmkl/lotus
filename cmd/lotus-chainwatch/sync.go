@@ -13,12 +13,14 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/specs-actors/actors/abi"
 	"github.com/filecoin-project/specs-actors/actors/abi/big"
 	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
 	"github.com/filecoin-project/specs-actors/actors/builtin/power"
+	"github.com/filecoin-project/specs-actors/actors/builtin/reward"
 	"github.com/filecoin-project/specs-actors/actors/util/adt"
 
 	"github.com/filecoin-project/lotus/api"
@@ -53,11 +55,20 @@ func runSyncer(ctx context.Context, api api.FullNode, st *storage, maxBatch int)
 	}()
 }
 
+type rewardStateInfo struct {
+	stateroot     cid.Cid
+	baselinePower big.Int
+}
+
 type minerStateInfo struct {
 	// common
 	addr      address.Address
 	act       types.Actor
 	stateroot cid.Cid
+
+	// calculating changes
+	tsKey       types.TipSetKey
+	parentTsKey types.TipSetKey
 
 	// miner specific
 	state miner.State
@@ -71,9 +82,10 @@ type minerStateInfo struct {
 }
 
 type actorInfo struct {
-	stateroot cid.Cid
-	tsKey     types.TipSetKey
-	state     string
+	stateroot   cid.Cid
+	tsKey       types.TipSetKey
+	parentTsKey types.TipSetKey
+	state       string
 }
 
 func syncHead(ctx context.Context, api api.FullNode, st *storage, headTs *types.TipSet, maxBatch int) {
@@ -169,6 +181,8 @@ func syncHead(ctx context.Context, api api.FullNode, st *storage, headTs *types.
 
 			if len(bh.Parents) == 0 { // genesis case
 				genesisTs, _ := types.NewTipSet([]*types.BlockHeader{bh})
+				st.genesisTs = genesisTs
+
 				aadrs, err := api.StateListActors(ctx, genesisTs.Key())
 				if err != nil {
 					log.Error(err)
@@ -201,9 +215,10 @@ func syncHead(ctx context.Context, api api.FullNode, st *storage, headTs *types.
 						actors[addr] = map[types.Actor]actorInfo{}
 					}
 					actors[addr][*act] = actorInfo{
-						stateroot: bh.ParentStateRoot,
-						tsKey:     genesisTs.Key(),
-						state:     string(state),
+						stateroot:   bh.ParentStateRoot,
+						tsKey:       genesisTs.Key(),
+						parentTsKey: genesisTs.Key(),
+						state:       string(state),
 					}
 					addressToID[addr] = address.Undef
 					alk.Unlock()
@@ -237,7 +252,6 @@ func syncHead(ctx context.Context, api api.FullNode, st *storage, headTs *types.
 				}
 
 				ast, err := api.StateReadState(ctx, addr, pts.Key())
-
 				if err != nil {
 					log.Error(err)
 					return
@@ -256,15 +270,18 @@ func syncHead(ctx context.Context, api api.FullNode, st *storage, headTs *types.
 				}
 				// a change occurred for the actor with address `addr` and state `act` at tipset `pts`.
 				actors[addr][act] = actorInfo{
-					stateroot: bh.ParentStateRoot,
-					state:     string(state),
-					tsKey:     pts.Key(),
+					stateroot:   bh.ParentStateRoot,
+					state:       string(state),
+					tsKey:       pts.Key(),
+					parentTsKey: pts.Parents(),
 				}
 				addressToID[addr] = address.Undef
 				alk.Unlock()
 			}
 		})
 
+		// map of tipset to reward state
+		rewardTips := make(map[types.TipSetKey]*rewardStateInfo, len(changes))
 		// map of tipset to all miners that had a head-change at that tipset.
 		minerTips := make(map[types.TipSetKey][]*minerStateInfo, len(changes))
 		// heads we've seen, im being paranoid
@@ -294,36 +311,73 @@ func syncHead(ctx context.Context, api api.FullNode, st *storage, headTs *types.
 			alk.Unlock()
 		})
 
-		log.Infof("Getting miner info")
+		log.Infof("Getting actor change info")
 
 		minerChanges := 0
 		for addr, m := range actors {
 			for actor, c := range m {
-				if actor.Code != builtin.StorageMinerActorCodeID {
+				// reward actor
+				if actor.Code == builtin.RewardActorCodeID {
+					rewardTips[c.tsKey] = &rewardStateInfo{
+						stateroot:     c.stateroot,
+						baselinePower: big.Zero(),
+					}
 					continue
 				}
 
-				// only want miner actors with head change events
-				if _, found := headsSeen[actor.Head]; found {
-					continue
+				// miner actors with head change events
+				if actor.Code == builtin.StorageMinerActorCodeID {
+					if _, found := headsSeen[actor.Head]; found {
+						continue
+					}
+					minerChanges++
+
+					minerTips[c.tsKey] = append(minerTips[c.tsKey], &minerStateInfo{
+						addr:      addr,
+						act:       actor,
+						stateroot: c.stateroot,
+
+						tsKey:       c.tsKey,
+						parentTsKey: c.parentTsKey,
+
+						state: miner.State{},
+						info:  nil,
+
+						rawPower: big.Zero(),
+						qalPower: big.Zero(),
+					})
+
+					headsSeen[actor.Head] = struct{}{}
 				}
-				minerChanges++
-
-				minerTips[c.tsKey] = append(minerTips[c.tsKey], &minerStateInfo{
-					addr:      addr,
-					act:       actor,
-					stateroot: c.stateroot,
-
-					state: miner.State{},
-					info:  nil,
-
-					rawPower: big.Zero(),
-					qalPower: big.Zero(),
-				})
-
-				headsSeen[actor.Head] = struct{}{}
+				continue
 			}
 		}
+
+		rewardProcessingStartedAt := time.Now()
+		parmap.Par(50, parmap.KVMapArr(rewardTips), func(it func() (types.TipSetKey, *rewardStateInfo)) {
+			tsKey, rewardInfo := it()
+			// get reward actor states at each tipset once for all updates
+			rewardActor, err := api.StateGetActor(ctx, builtin.RewardActorAddr, tsKey)
+			if err != nil {
+				log.Error(xerrors.Errorf("get reward state (@ %s): %w", rewardInfo.stateroot.String(), err))
+				return
+			}
+
+			rewardStateRaw, err := api.ChainReadObj(ctx, rewardActor.Head)
+			if err != nil {
+				log.Error(xerrors.Errorf("read state obj (@ %s): %w", rewardInfo.stateroot.String(), err))
+				return
+			}
+
+			var rewardActorState reward.State
+			if err := rewardActorState.UnmarshalCBOR(bytes.NewReader(rewardStateRaw)); err != nil {
+				log.Error(xerrors.Errorf("unmarshal state (@ %s): %w", rewardInfo.stateroot.String(), err))
+				return
+			}
+
+			rewardInfo.baselinePower = rewardActorState.BaselinePower
+		})
+		log.Infow("Completed Reward Processing", "duration", time.Since(rewardProcessingStartedAt).String(), "processed", len(rewardTips))
 
 		minerProcessingStartedAt := time.Now()
 		log.Infow("Processing miners", "numTips", len(minerTips), "numMinerChanges", minerChanges)
@@ -404,11 +458,16 @@ func syncHead(ctx context.Context, api api.FullNode, st *storage, headTs *types.
 		}
 
 		log.Info("Storing actors")
-
 		if err := st.storeActors(actors); err != nil {
 			log.Error(err)
 			return
 		}
+
+		chainPowerStartedAt := time.Now()
+		if err := st.storeChainPower(rewardTips); err != nil {
+			log.Error(err)
+		}
+		log.Infow("Stored chain power", "duration", time.Since(chainPowerStartedAt).String())
 
 		log.Info("Storing miners")
 		if err := st.storeMiners(minerTips); err != nil {
@@ -416,16 +475,27 @@ func syncHead(ctx context.Context, api api.FullNode, st *storage, headTs *types.
 			return
 		}
 
-		log.Info("Storing miner sectors")
+		minerPowerStartedAt := time.Now()
+		if err := st.storeMinerPower(minerTips); err != nil {
+			log.Error(err)
+		}
+		log.Infow("Stored miner power", "duration", time.Since(minerPowerStartedAt).String())
+
 		sectorStart := time.Now()
 		if err := st.storeSectors(minerTips, api); err != nil {
 			log.Error(err)
 			return
 		}
-		log.Infow("Finished storing miner sectors", "duration", time.Since(sectorStart).String())
+		log.Infow("Stored miner sectors", "duration", time.Since(sectorStart).String())
 
 		log.Info("Storing miner sectors heads")
 		if err := st.storeMinerSectorsHeads(minerTips, api); err != nil {
+			log.Error(err)
+			return
+		}
+
+		log.Info("updating miner sectors heads")
+		if err := st.updateMinerSectors(minerTips, api); err != nil {
 			log.Error(err)
 			return
 		}

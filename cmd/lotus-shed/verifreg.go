@@ -531,10 +531,12 @@ var verifRegCheckVerifierCmd = &cli.Command{
 			return err
 		}
 
-		vh, err := hamt.LoadNode(ctx, cst, st.Verifiers)
+		vh, err := hamt.LoadNode(ctx, cst, st.Verifiers, hamt.UseTreeBitWidth(5))
 		if err != nil {
 			return err
 		}
+
+		fmt.Printf("loaded node %v\n", vh)
 
 		var dcap verifreg.DataCap
 		if err := vh.Find(ctx, string(vaddr.Bytes()), &dcap); err != nil {

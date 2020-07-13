@@ -382,7 +382,8 @@ var clientDealCmd = &cli.Command{
 
 		fmt.Printf("data cap %s\n", dcap)
 
-		isVerified := false
+		isVerified := dcap != nil
+		isVerifiedDeal := false
 
 		// If the user has explicitly set the --verified-deal flag
 		if cctx.IsSet("verified-deal") {
@@ -394,7 +395,7 @@ var clientDealCmd = &cli.Command{
 			}
 
 			// Override the default
-			isVerified = verifiedDealParam
+			isVerifiedDeal = verifiedDealParam
 		}
 
 		proposal, err := api.ClientStartDeal(ctx, &lapi.StartDealParams{
@@ -405,7 +406,7 @@ var clientDealCmd = &cli.Command{
 			MinBlocksDuration: uint64(dur),
 			DealStartEpoch:    abi.ChainEpoch(cctx.Int64("start-epoch")),
 			FastRetrieval:     cctx.Bool("fast-retrieval"),
-			VerifiedDeal:      isVerified,
+			VerifiedDeal:      isVerifiedDeal,
 		})
 		if err != nil {
 			return err

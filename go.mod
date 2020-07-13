@@ -130,4 +130,7 @@ replace github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
 replace github.com/filecoin-project/go-fil-markets => /home/sami/go-fil-markets
+
 replace github.com/filecoin-project/specs-actors => /home/sami/specs-actors
+
+replace github.com/ipfs/go-hamt-ipld => /home/sami/go-hamt-ipld

@@ -380,7 +380,9 @@ var clientDealCmd = &cli.Command{
 			return err
 		}
 
-		isVerified := dcap != nil
+		fmt.Printf("data cap %s\n", dcap)
+
+		isVerified := false
 
 		// If the user has explicitly set the --verified-deal flag
 		if cctx.IsSet("verified-deal") {

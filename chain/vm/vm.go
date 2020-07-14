@@ -35,6 +35,7 @@ import (
 )
 
 var log = logging.Logger("vm")
+var actorLog = logging.Logger("actors")
 var gasOnActorExec = newGasCharge("OnActorExec", 0, 0)
 
 // ResolveToKeyAddr returns the public key type of address (`BLS`/`SECP256K1`) of an account actor identified by `addr`.
@@ -128,6 +129,14 @@ func (vm *VM) makeRuntime(ctx context.Context, msg *types.Message, origin addres
 	rt.vmsg = &vmm
 
 	return rt
+}
+
+type UnsafeVM struct {
+	VM *VM
+}
+
+func (vm *UnsafeVM) MakeRuntime(ctx context.Context, msg *types.Message, origin address.Address, originNonce uint64, usedGas int64, nac uint64) *Runtime {
+	return vm.VM.makeRuntime(ctx, msg, origin, originNonce, usedGas, nac)
 }
 
 type VM struct {
@@ -675,7 +684,7 @@ func (vm *VM) transfer(from, to address.Address, amt types.BigInt) aerrors.Actor
 	}
 
 	if err := deductFunds(f, amt); err != nil {
-		return aerrors.Newf(exitcode.SysErrInsufficientFunds, "transfer failed when deducting funds: %s", err)
+		return aerrors.Newf(exitcode.SysErrInsufficientFunds, "transfer failed when deducting funds from %s to %s: %s", fromID, toID, err)
 	}
 	depositFunds(t, amt)
 

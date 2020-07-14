@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
-	"github.com/filecoin-project/lotus/build"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/build"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
@@ -32,18 +34,24 @@ var verifRegCmd = &cli.Command{
 		verifRegListClientsCmd,
 		verifRegCheckClientCmd,
 		verifRegCheckVerifierCmd,
+		verifRegSetRootCmd,
 	},
 }
 
 var verifRegAddVerifierCmd = &cli.Command{
 	Name:  "add-verifier",
 	Usage: "make a given account a verifier",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "dry",
+			Usage: "only prints tx param data",
+		},
+		&cli.StringFlag{
+			Name:  "from",
+			Usage: "specify your verifier address to send the message from",
+		},
+	},
 	Action: func(cctx *cli.Context) error {
-		fromk, err := address.NewFromString("t3qfoulel6fy6gn3hjmbhpdpf6fs5aqjb5fkurhtwvgssizq4jey5nw4ptq5up6h7jk7frdvvobv52qzmgjinq")
-		if err != nil {
-			return err
-		}
-
 		if cctx.Args().Len() != 2 {
 			return fmt.Errorf("must specify two arguments: address and allowance")
 		}
@@ -63,6 +71,11 @@ var verifRegAddVerifierCmd = &cli.Command{
 			return err
 		}
 
+		if cctx.Bool("dry") {
+			fmt.Println(hex.EncodeToString(params))
+			return nil
+		}
+
 		api, closer, err := lcli.GetFullNodeAPI(cctx)
 		if err != nil {
 			return err
@@ -70,10 +83,91 @@ var verifRegAddVerifierCmd = &cli.Command{
 		defer closer()
 		ctx := lcli.ReqContext(cctx)
 
+		froms := cctx.String("from")
+		if froms == "" {
+			return fmt.Errorf("must specify from address with --from")
+		}
+
+		fromk, err := address.NewFromString(froms)
+		if err != nil {
+			return err
+		}
+
 		msg := &types.Message{
 			To:       builtin.VerifiedRegistryActorAddr,
 			From:     fromk,
 			Method:   builtin.MethodsVerifiedRegistry.AddVerifier,
+			GasPrice: types.NewInt(1),
+			GasLimit: 300000,
+			Params:   params,
+		}
+
+		smsg, err := api.MpoolPushMessage(ctx, msg)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("message sent, now waiting on cid: %s\n", smsg.Cid())
+
+		mwait, err := api.StateWaitMsg(ctx, smsg.Cid(), build.MessageConfidence)
+		if err != nil {
+			return err
+		}
+
+		if mwait.Receipt.ExitCode != 0 {
+			return fmt.Errorf("failed to add verifier: %d", mwait.Receipt.ExitCode)
+		}
+
+		return nil
+
+	},
+}
+
+var verifRegSetRootCmd = &cli.Command{
+	Name:  "set-root",
+	Usage: "make a key the new root key",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "from",
+			Usage: "specify your rootkey address to send the message from",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		if cctx.Args().Len() != 1 {
+			return fmt.Errorf("must specify one argument: address")
+		}
+
+		target, err := address.NewFromString(cctx.Args().Get(0))
+		if err != nil {
+			return err
+		}
+
+		params, err := actors.SerializeParams(target)
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetFullNodeAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+		ctx := lcli.ReqContext(cctx)
+
+		froms := cctx.String("from")
+		if froms == "" {
+			return fmt.Errorf("must specify from address with --from")
+		}
+
+		fromk, err := address.NewFromString(froms)
+		if err != nil {
+			return err
+		}
+
+		msg := &types.Message{
+			To:       builtin.VerifiedRegistryActorAddr,
+			From:     fromk,
+			Method:   builtin.MethodsVerifiedRegistry.ReplaceRootKey,
 			GasPrice: types.NewInt(1),
 			GasLimit: 300000,
 			Params:   params,
@@ -199,7 +293,7 @@ var verifRegListVerifiersCmd = &cli.Command{
 			return err
 		}
 
-		vh, err := hamt.LoadNode(ctx, cst, st.Verifiers)
+		vh, err := hamt.LoadNode(ctx, cst, st.Verifiers, hamt.UseTreeBitWidth(5))
 		if err != nil {
 			return err
 		}
@@ -251,7 +345,7 @@ var verifRegListClientsCmd = &cli.Command{
 			return err
 		}
 
-		vh, err := hamt.LoadNode(ctx, cst, st.VerifiedClients)
+		vh, err := hamt.LoadNode(ctx, cst, st.VerifiedClients, hamt.UseTreeBitWidth(5))
 		if err != nil {
 			return err
 		}
@@ -299,30 +393,15 @@ var verifRegCheckClientCmd = &cli.Command{
 		defer closer()
 		ctx := lcli.ReqContext(cctx)
 
-		act, err := api.StateGetActor(ctx, builtin.VerifiedRegistryActorAddr, types.EmptyTSK)
+		dcap, err := api.StateVerifiedClientStatus(ctx, caddr, types.EmptyTSK)
 		if err != nil {
 			return err
 		}
-
-		apibs := apibstore.NewAPIBlockstore(api)
-		cst := cbor.NewCborStore(apibs)
-
-		var st verifreg.State
-		if err := cst.Get(ctx, act.Head, &st); err != nil {
-			return err
+		if dcap == nil {
+			return xerrors.Errorf("client %s is not a verified client", err)
 		}
 
-		vh, err := hamt.LoadNode(ctx, cst, st.VerifiedClients)
-		if err != nil {
-			return err
-		}
-
-		var dcap verifreg.DataCap
-		if err := vh.Find(ctx, string(caddr.Bytes()), &dcap); err != nil {
-			return err
-		}
-
-		fmt.Println(dcap)
+		fmt.Println(*dcap)
 
 		return nil
 	},
@@ -361,7 +440,7 @@ var verifRegCheckVerifierCmd = &cli.Command{
 			return err
 		}
 
-		vh, err := hamt.LoadNode(ctx, cst, st.Verifiers)
+		vh, err := hamt.LoadNode(ctx, cst, st.Verifiers, hamt.UseTreeBitWidth(5))
 		if err != nil {
 			return err
 		}

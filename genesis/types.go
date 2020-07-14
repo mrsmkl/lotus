@@ -64,6 +64,7 @@ type Actor struct {
 type Template struct {
 	Accounts []Actor
 	Miners   []Miner
+	RootKey  address.Address
 
 	NetworkName string
 	Timestamp   uint64 `json:",omitempty"`

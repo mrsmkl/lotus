@@ -52,7 +52,7 @@ do
  lotus-storage-miner sectors list
 done
 
-curl -H "Content-Type: application/json" -H "Authorization: Bearer $(cat ~/.lotusstorage/token)" -d '{"id": 1, "method": "Filecoin.SectorStartSealing", "params": [3]}' localhost:2345/rpc/v0
+curl -H "Content-Type: application/json" -H "Authorization: Bearer $(cat ~/.lotusstorage/token)" -d '{"id": 1, "method": "Filecoin.SectorStartSealing", "params": [2]}' localhost:2345/rpc/v0
 
 lotus-storage-miner info
 

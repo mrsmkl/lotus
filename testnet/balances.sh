@@ -6,12 +6,14 @@ lotus wait-api
 
 lotus chain head
 
-export MAIN=$(cat ../localnet2.json | jq -r '.Accounts | .[0] | .Meta .Owner')
+export MAIN=$(cat ../localnet.json | jq -r '.Accounts | .[0] | .Meta .Owner')
 
-export ROOT=$(cat ../localnet2.json | jq -r '.RootKey')
+export ROOT1=t1macdda4f5osjhobtg6ycqbdlomsedjt2zijdtuy
+export ROOT2=t1dce6ymzvvl3m3nk3o74ztkg4izmvzarky3uqtza
 
 # Send funds to root key
-lotus send --source $MAIN $ROOT 5000000
+lotus send --source $MAIN $ROOT2 5000000
+lotus send --source $MAIN $ROOT1 5000000
 
 export VERIFIER=$(lotus wallet new)
 export CLIENT=$(lotus wallet new)
@@ -22,17 +24,23 @@ lotus send --source $MAIN $VERIFIER 5000000
 # Send funds to client
 lotus send --source $MAIN $CLIENT 5000000
 
-while [ "5000000 FIL" != "$(lotus wallet balance $ROOT)" ]
+while [ "5000000 FIL" != "$(lotus wallet balance $ROOT1)" ]
 do
  sleep 1
- lotus wallet balance $ROOT
+ lotus wallet balance $ROOT1
 done
 
 
 # lotus-shed verifreg add-verifier t080 100000000000000000000000000000000000000000
 # lotus-shed verifreg add-verifier t1fj2s6phuwkn32t3ocilhcpd2vwuu2zdcngdcqhy 100000000000000000000000000000000000000000
 
-lotus-shed verifreg add-verifier --from $ROOT t01001 100000000000000000000000000000000000000000
+export PARAM=$(lotus-shed verifreg add-verifier --dry t01003 100000000000000000000000000000000000000000)
+
+# lotus-shed verifreg add-verifier --from $ROOT t01003 100000000000000000000000000000000000000000
+lotus msig propose --source $ROOT1 t0101 t06 0 2 $PARAM
+lotus msig inspect t0101
+
+lotus msig approve --source $ROOT2 t0101 0 $ROOT1 t06 0 2 $PARAM
 
 lotus-shed verifreg list-verifiers
 
@@ -52,6 +60,7 @@ do
  lotus-storage-miner sectors list
 done
 
+# hmm
 curl -H "Content-Type: application/json" -H "Authorization: Bearer $(cat ~/.lotusstorage/token)" -d '{"id": 1, "method": "Filecoin.SectorStartSealing", "params": [2]}' localhost:2345/rpc/v0
 
 lotus-storage-miner info
